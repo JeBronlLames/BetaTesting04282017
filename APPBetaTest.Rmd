@@ -1,0 +1,200 @@
+---
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, comment = FALSE, warning = FALSE, message = FALSE)
+```
+
+## Geographic Interface
+
+```{r backend, message = FALSE, warning = FALSE, comment = FALSE}
+####################################################################################################
+#----------------------------- Converting LSD to GPS for use in Leaflet ---------------------------#
+####################################################################################################
+
+#[][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][]#
+#------------------------------------------ BEGIN ANALYSIS ----------------------------------------#
+#[][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][][]#
+
+#<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>#
+#--------------------------------------------------------------------------------------------------#
+# Load packages
+require("leaflet")
+require("survival")
+require("dplyr")
+require("ggplot2")
+require("lubridate")
+require("RColorBrewer")
+require("reshape2")
+require("tidyr")
+require("stringr")
+#--------------------------------------------------------------------------------------------------#
+
+#<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>#
+#--------------------------------------------------------------------------------------------------#
+# Done once to create permanent copy of r variable `cust_data` from report()
+#write.csv(cust_data, file = "SuncorData_Apr-26-2017.csv", row.names = FALSE)
+#--------------------------------------------------------------------------------------------------#
+
+#<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>#
+#--------------------------------------------------------------------------------------------------#
+# Formatting Customer Data for testing
+setwd("~/desktop folders/Data Analysis - Coursera/CUBE/SAGD/SUNCOR ENERGY INC/LSD_GPS")
+
+my_data <- read.csv("SuncorData_Apr-26-2017.csv")
+
+my_data <- mutate(my_data, InstallDate = ymd(InstallDate),
+                 PullDate = ymd(PullDate))
+#--------------------------------------------------------------------------------------------------#
+
+#<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>#
+#--------------------------------------------------------------------------------------------------#
+# Formatting Customer Data for testing
+#coords_df <- data.frame(wells = , lat = , lng = )
+
+test_lat <- runif(n = 200, min = 57.2, max = 57.5)
+test_lng <- runif(n = 200, min = -110.9, max = -110.1)
+test_wells <- sapply(1:200, function(i) paste0("SUwell ", i))
+test_coords <- data.frame(Well = test_wells, lat = test_lat, lng = test_lng)
+# 57.229907° -110.836088° 
+
+CVE_lat <- runif(n = 200, min = 55.0, max = 55.3)
+CVE_lng <- runif(n = 200, min = -110.85, max = -110.0)
+CVE_wells <- sapply(1:200, function(i) paste0("CVE Foster Creek well ", i))
+CVE_coords <- data.frame(Well = CVE_wells, lat = CVE_lat, lng = CVE_lng)
+# 55.058768° -110.459801° 
+
+NXY_lat <- runif(n = 100, min = 56.3, max = 56.5)
+NXY_lng <- runif(n = 100, min = -111.0, max = -110.4)
+NXY_wells <- sapply(1:100, function(i) paste0("NXY Long Lake well ", i))
+NXY_coords <- data.frame(Well = NXY_wells, lat = NXY_lat, lng = NXY_lng)
+# 56.418965° -110.931123° 
+
+MEG_lat <- rnorm(n = 80, mean = 55.67, sd = 0.05)
+MEG_lng <- rnorm(n = 80, mean = -111.25, sd = 0.05)
+MEG_wells <- sapply(1:80, function(i) paste0("MEG well ", i))
+MEG_coords <- data.frame(Well = MEG_wells, lat = MEG_lat, lng = MEG_lng)
+#55.677212° -110.778544° 
+
+CNQ_lat <- rnorm(n = 60, mean = 57.25, sd = 0.05)
+CNQ_lng <- rnorm(n = 60, mean = -111.1, sd = 0.05)
+CNQ_wells <- sapply(1:60, function(i) paste0("CNQ Kirby well ", i))
+CNQ_coords <- data.frame(Well = CNQ_wells, lat = CNQ_lat, lng = CNQ_lng)
+# 57.251772° -111.100174° 
+
+#--------------------------------------------------------------------------------------------------#
+
+#<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>#
+#--------------------------------------------------------------------------------------------------#
+# Creating customer icons
+SU_icon <- makeIcon(
+        iconUrl = "http://staticseekingalpha1.a.ssl.fastly.net/images/marketing_images/fair_use_logos_products/sacl_su_suncor_energy_logo.png",
+        iconWidth = 30*1280/587,
+        iconHeight = 30)
+
+CVE_icon <- makeIcon(
+        iconUrl = "http://www.evokinnovations.com/wp-content/uploads/2016/09/CVE_2clr_RGB_U.png",
+        iconWidth = 30*3246/772,
+        iconHeight = 30)
+
+NXY_icon <- makeIcon(
+        iconUrl = "http://cdn.hotstocked.com/hotstocked.com/articles-img/small/nexen_logo.png",
+        iconWidth = 30*336/156,
+        iconHeight = 30)
+
+MEG_icon <- makeIcon(
+        iconUrl = "http://d3ham790trbkqy.cloudfront.net/wp-content/uploads/sites/4/2015/11/meg_energy-215x300.png",
+        iconWidth = 30*215/300,
+        iconHeight = 30)
+
+CNQ_icon <- makeIcon(
+        iconUrl = "http://www.cnrl.com/images/layout/logo.gif",
+        iconWidth = 25*191/84,
+        iconHeight = 25)
+#--------------------------------------------------------------------------------------------------#
+
+#<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>#
+#--------------------------------------------------------------------------------------------------#
+# Creating customer popups
+CVEpopups <- paste("Well:", CVE_coords$Well, "<br>",
+                     "Latitude:", CVE_coords$lat, "<br>",
+                     "Longitude:", CVE_coords$lng, "<br>",
+                     "LinkToMAPS:", "<a href='http://maps:8080/production/Index.jsp'>GO TO MAPS</a>","<br>",
+                     "LinkToAPP:", "<a href='https://hollcod.shinyapps.io/CourseProject/'>GO TO APP</a>")        
+
+SUpopups <- paste("Well:", test_coords$Well, "<br>",
+                   "Latitude:", test_coords$lat, "<br>",
+                   "Longitude:", test_coords$lng, "<br>",
+                   "LinkToMAPS:", "<a href='http://maps:8080/production/Index.jsp'>GO TO MAPS</a>","<br>",
+                   "LinkToAPP:", "<a href='https://hollcod.shinyapps.io/CourseProject/'>GO TO APP</a>")        
+
+NXYpopups <- paste("Well:", NXY_coords$Well, "<br>",
+                  "Latitude:", NXY_coords$lat, "<br>",
+                  "Longitude:", NXY_coords$lng, "<br>",
+                  "LinkToMAPS:", "<a href='http://maps:8080/production/Index.jsp'>GO TO MAPS</a>","<br>",
+                  "LinkToAPP:", "<a href='https://hollcod.shinyapps.io/CourseProject/'>GO TO APP</a>")        
+
+MEGpopups <- paste("Well:", MEG_coords$Well, "<br>",
+                   "Latitude:", MEG_coords$lat, "<br>",
+                   "Longitude:", MEG_coords$lng, "<br>",
+                   "LinkToMAPS:", "<a href='http://maps:8080/production/Index.jsp'>GO TO MAPS</a>","<br>",
+                   "LinkToAPP:", "<a href='https://hollcod.shinyapps.io/CourseProject/'>GO TO APP</a>")        
+
+CNQpopups <- paste("Well:", CNQ_coords$Well, "<br>",
+                   "Latitude:", CNQ_coords$lat, "<br>",
+                   "Longitude:", CNQ_coords$lng, "<br>",
+                   "LinkToMAPS:", "<a href='http://maps:8080/production/Index.jsp'>GO TO MAPS</a>","<br>",
+                   "LinkToAPP:", "<a href='https://hollcod.shinyapps.io/CourseProject/'>GO TO APP</a>")        
+
+
+
+#--------------------------------------------------------------------------------------------------#
+```
+
+
+```{r doinstuff, fig.height=10, fig.width=14}
+#<><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>#
+#--------------------------------------------------------------------------------------------------#
+# Creating interactive maps
+my_map <- leaflet() %>% addTiles() %>% addMarkers(lat = test_coords$lat,
+                                                  lng = test_coords$lng,
+                                                  popup = SUpopups,
+                                                  icon = SU_icon,
+                                                  clusterOptions = markerClusterOptions())
+
+my_map <- my_map %>% addMarkers(lat = CVE_coords$lat, lng = CVE_coords$lng,
+                      popup = CVEpopups,
+                      icon = CVE_icon,
+                      clusterOptions = markerClusterOptions())
+
+my_map <- my_map %>% addMarkers(lat = NXY_coords$lat, lng = NXY_coords$lng,
+                                popup = NXYpopups,
+                                icon = NXY_icon,
+                                clusterOptions = markerClusterOptions()) 
+
+my_map <- my_map %>% addMarkers(lat = MEG_coords$lat, lng = MEG_coords$lng,
+                                popup = MEGpopups,
+                                icon = MEG_icon,
+                                clusterOptions = markerClusterOptions()) 
+
+my_map <- my_map %>% addMarkers(lat = CNQ_coords$lat, lng = CNQ_coords$lng,
+                                popup = CNQpopups,
+                                icon = CNQ_icon,
+                                clusterOptions = markerClusterOptions()) 
+
+
+my_map
+```
+
+
+
+
+
+
+
+
+
+
+
+
